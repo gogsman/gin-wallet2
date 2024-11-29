@@ -11,6 +11,14 @@ require (
 )
 
 require (
+	github.com/joho/godotenv v1.5.1 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/rs/zerolog v1.33.0 // indirect
+	github.com/shopspring/decimal v1.4.0 // indirect
+	go.uber.org/goleak v1.3.0 // indirect
+)
+
+require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/bytedance/sonic v1.12.5 // indirect
 	github.com/bytedance/sonic/loader v0.2.1 // indirect

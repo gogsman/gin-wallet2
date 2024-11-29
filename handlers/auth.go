@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -11,7 +12,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-var jwtSecret = []byte("wallet-jwt-secret")
+var jwtSecret = []byte(os.Getenv("JWT_SECRET"))
 
 type AuthHandler struct {
 	DB *sql.DB
