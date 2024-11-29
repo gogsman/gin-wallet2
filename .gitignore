@@ -35,3 +35,4 @@ _testmain.go
 /deploy
 *.local.yml
 /public/temp/*
+.env
