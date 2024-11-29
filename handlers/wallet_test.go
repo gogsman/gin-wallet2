@@ -68,7 +68,62 @@ func TestWalletHandler_Deposit(t *testing.T) {
 				"error": "Invalid input",
 			},
 		},
+		{
+			name: "update balance rollback",
+			requestBody: map[string]interface{}{
+				"user_id": 1,
+				"amount":  99999999999999999,
+			},
+			setupMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectBegin()
+				mock.ExpectExec("UPDATE users").
+					WithArgs(99999999999999999.0, 1).
+					WillReturnError(sql.ErrConnDone) // Simulate insert error
+				mock.ExpectRollback()
+			},
+			expectedStatus: http.StatusInternalServerError,
+			expectedBody: map[string]interface{}{
+				"error": "Failed to update balance",
+			},
+		},
+		{
+			name: "transaction rollback",
+			requestBody: map[string]interface{}{
+				"user_id": 1,
+				"amount":  100.0,
+			},
+			setupMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectBegin()
+				mock.ExpectExec("UPDATE users").
+					WithArgs(100.0, 1).
+					WillReturnResult(sqlmock.NewResult(0, 1))
+				mock.ExpectExec("INSERT INTO transactions").
+					WithArgs(1, "deposit", 100.0, "Deposit to wallet").
+					WillReturnError(sql.ErrConnDone) // Simulate insert error
+				mock.ExpectRollback()
+			},
+			expectedStatus: http.StatusInternalServerError,
+			expectedBody: map[string]interface{}{
+				"error": "Failed to record transaction",
+			},
+		},
+		{
+			name: "begin transaction error",
+			requestBody: map[string]interface{}{
+				"user_id": 1,
+				"amount":  100.0,
+			},
+			setupMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectBegin().WillReturnError(sql.ErrConnDone)
+			},
+			expectedStatus: http.StatusInternalServerError,
+			expectedBody: map[string]interface{}{
+				"error": "Failed to start transaction",
+			},
+		},
 	}
+
+	// runHandlerTests(t, handler.Transfer, tests, mock)
 
 	// Run tests
 	for _, tt := range tests {
@@ -149,6 +204,18 @@ func TestWalletHandler_Withdraw(t *testing.T) {
 			},
 		},
 		{
+			name: "invalid amount",
+			requestBody: map[string]interface{}{
+				"user_id": 1,
+				"amount":  -50.0,
+			},
+			setupMock:      func(mock sqlmock.Sqlmock) {},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody: map[string]interface{}{
+				"error": "Invalid input",
+			},
+		},
+		{
 			name: "insufficient balance",
 			requestBody: map[string]interface{}{
 				"user_id": 1,
@@ -164,6 +231,65 @@ func TestWalletHandler_Withdraw(t *testing.T) {
 			expectedStatus: http.StatusBadRequest,
 			expectedBody: map[string]interface{}{
 				"error": "Insufficient balance",
+			},
+		},
+		{
+			name: "update balance rollback",
+			requestBody: map[string]interface{}{
+				"user_id": 1,
+				"amount":  50.0,
+			},
+			setupMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectBegin()
+				mock.ExpectQuery("SELECT balance FROM users").
+					WithArgs(1).
+					WillReturnRows(sqlmock.NewRows([]string{"balance"}).AddRow(100.0))
+				mock.ExpectExec("UPDATE users").
+					WithArgs(50.0, 1).
+					WillReturnError(sql.ErrConnDone) // Simulate insert error
+				mock.ExpectRollback()
+			},
+			expectedStatus: http.StatusInternalServerError,
+			expectedBody: map[string]interface{}{
+				"error": "Failed to update balance",
+			},
+		},
+		{
+			name: "transaction rollback",
+			requestBody: map[string]interface{}{
+				"user_id": 1,
+				"amount":  50.0,
+			},
+			setupMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectBegin()
+				mock.ExpectQuery("SELECT balance FROM users").
+					WithArgs(1).
+					WillReturnRows(sqlmock.NewRows([]string{"balance"}).AddRow(100.0))
+				mock.ExpectExec("UPDATE users").
+					WithArgs(50.0, 1).
+					WillReturnResult(sqlmock.NewResult(0, 1))
+				mock.ExpectExec("INSERT INTO transactions").
+					WithArgs(1, "withdraw", 50.0, "Withdraw from wallet").
+					WillReturnError(sql.ErrConnDone) // Simulate insert error
+				mock.ExpectRollback()
+			},
+			expectedStatus: http.StatusInternalServerError,
+			expectedBody: map[string]interface{}{
+				"error": "Failed to record transaction",
+			},
+		},
+		{
+			name: "begin transaction error",
+			requestBody: map[string]interface{}{
+				"user_id": 1,
+				"amount":  50.0,
+			},
+			setupMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectBegin().WillReturnError(sql.ErrConnDone)
+			},
+			expectedStatus: http.StatusInternalServerError,
+			expectedBody: map[string]interface{}{
+				"error": "Failed to start transaction",
 			},
 		},
 	}
@@ -221,6 +347,76 @@ func TestWalletHandler_Transfer(t *testing.T) {
 				"message": "Transfer successful",
 			},
 		},
+		{
+			name: "invalid amount",
+			requestBody: map[string]interface{}{
+				"user_id": 1,
+				"amount":  -100.0,
+			},
+			setupMock:      func(mock sqlmock.Sqlmock) {},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody: map[string]interface{}{
+				"error": "Invalid input",
+			},
+		},
+		{
+			name: "recipient user not found",
+			requestBody: map[string]interface{}{
+				"from_user_id": 1,
+				"to_user_id":   999,
+				"amount":       50.0,
+			},
+			setupMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery("SELECT id FROM users").
+					WithArgs(999).
+					WillReturnError(sql.ErrNoRows)
+			},
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody: map[string]interface{}{
+				"error": "Invalid credentials",
+			},
+		},
+		{
+			name: "Insufficient balance",
+			requestBody: map[string]interface{}{
+				"from_user_id": 1,
+				"to_user_id":   2,
+				"amount":       150.0,
+			},
+			setupMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery("SELECT id FROM users").
+					WithArgs(2).
+					WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(2))
+				mock.ExpectBegin()
+				mock.ExpectQuery("SELECT balance FROM users").
+					WithArgs(1).
+					WillReturnRows(sqlmock.NewRows([]string{"balance"}).AddRow(100.0)).
+					WillReturnError(sql.ErrConnDone)
+				mock.ExpectRollback()
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody: map[string]interface{}{
+				"error": "Insufficient balance",
+			},
+		},
+		{
+			name: "begin transaction error",
+			requestBody: map[string]interface{}{
+				"from_user_id": 1,
+				"to_user_id":   2,
+				"amount":       50.0,
+			},
+			setupMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery("SELECT id FROM users").
+					WithArgs(2).
+					WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(2))
+				mock.ExpectBegin().WillReturnError(sql.ErrConnDone)
+			},
+			expectedStatus: http.StatusInternalServerError,
+			expectedBody: map[string]interface{}{
+				"error": "Failed to start transaction",
+			},
+		},
 	}
 
 	runHandlerTests(t, handler.Transfer, tests, mock)
@@ -267,6 +463,19 @@ func TestWalletHandler_GetBalance(t *testing.T) {
 			expectedStatus: http.StatusNotFound,
 			expectedBody: map[string]interface{}{
 				"error": "User not found",
+			},
+		},
+		{
+			name:   "database error",
+			userID: "999",
+			setupMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery("SELECT balance FROM users").
+					WithArgs("999").
+					WillReturnError(sql.ErrConnDone)
+			},
+			expectedStatus: http.StatusInternalServerError,
+			expectedBody: map[string]interface{}{
+				"error": "Database error",
 			},
 		},
 	}

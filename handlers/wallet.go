@@ -3,8 +3,10 @@ package handlers
 import (
 	"database/sql"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"github.com/shopspring/decimal"
 )
 
 type WalletHandler struct {
@@ -13,14 +15,6 @@ type WalletHandler struct {
 
 func NewWalletHandler(db *sql.DB) *WalletHandler {
 	return &WalletHandler{DB: db}
-}
-
-var Transactions []struct {
-	ID          int     `json:"id"`
-	Type        string  `json:"type"`
-	Amount      float64 `json:"amount"`
-	Description string  `json:"description"`
-	CreatedAt   string  `json:"created_at"`
 }
 
 func (h *WalletHandler) Deposit(c *gin.Context) {
