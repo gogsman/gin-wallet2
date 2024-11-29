@@ -4,20 +4,33 @@ import (
 	"gin-wallet2/handlers"
 	"gin-wallet2/middleware"
 	"log"
+	"os"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
+	"github.com/rs/zerolog"
 )
+
+var zlog zerolog.Logger
+
+func init() {
+	if err := godotenv.Load(); err != nil {
+		log.Printf("Error loading .env file: %v", err)
+	}
+
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	zlog := zerolog.New(os.Stdout).With().Timestamp().Logger()
+	zerolog.DefaultContextLogger = &zlog
+}
 
 func main() {
 	db := InitDB()
+	defer db.Close()
 
 	r := gin.Default()
 
-	//setupRoutes(r)
-
 	auth := handlers.NewAuthHandler(db)
-
 	r.POST("/register", auth.Register)
 	r.POST("/login", auth.Login)
 
@@ -32,8 +45,14 @@ func main() {
 	}
 
 	port := ":8080"
-	log.Println("Server running on port", port)
+	zlog.Info().
+		Str("port", port).
+		Msg("Server starting")
+
 	if err := r.Run(port); err != nil {
-		log.Fatal("Failed to start server:", err)
+		zlog.Fatal().
+			Err(err).
+			Str("port", port).
+			Msg("Server failed to start")
 	}
 }
