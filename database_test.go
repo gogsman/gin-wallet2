@@ -4,6 +4,10 @@ import (
 	"testing"
 )
 
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
+
 func TestInitDB(t *testing.T) {
 	db1 := InitDB()
 	if db1 == nil {
