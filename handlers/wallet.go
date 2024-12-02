@@ -3,19 +3,26 @@ package handlers
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog"
 )
 
+var zlog zerolog.Logger
+
+// WalletHandler wallet handler
 type WalletHandler struct {
 	DB *sql.DB
 }
 
+// NewWalletHandler new wallet handler
 func NewWalletHandler(db *sql.DB) *WalletHandler {
 	return &WalletHandler{DB: db}
 }
 
+// Deposit deposit money to wallet
 func (h *WalletHandler) Deposit(c *gin.Context) {
 	var req struct {
 		UserID int     `json:"user_id"`
@@ -34,7 +41,11 @@ func (h *WalletHandler) Deposit(c *gin.Context) {
 
 	_, err = tx.Exec("UPDATE users SET balance = balance + $1 WHERE id = $2", req.Amount, req.UserID)
 	if err != nil {
-		tx.Rollback()
+		if rbErr := tx.Rollback(); rbErr != nil {
+			zlog.Fatal().
+				Err(rbErr).
+				Msg("Error failed to rollback transaction")
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update balance"})
 		return
 	}
@@ -42,15 +53,26 @@ func (h *WalletHandler) Deposit(c *gin.Context) {
 	_, err = tx.Exec("INSERT INTO transactions (user_id, type, amount, description) VALUES ($1, $2, $3, $4)",
 		req.UserID, "deposit", req.Amount, "Deposit to wallet")
 	if err != nil {
-		tx.Rollback()
+		if rbErr := tx.Rollback(); rbErr != nil {
+			zlog.Fatal().
+				Err(rbErr).
+				Msg("Error failed to rollback transaction")
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to record transaction"})
 		return
 	}
 
-	tx.Commit()
+	if err := tx.Commit(); err != nil {
+		zlog.Fatal().
+			Err(err).
+			Msg("Failed to commit transaction")
+		log.Printf(": %v", err)
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Deposit successful"})
 }
 
+// Withdraw withdraw money from wallet
 func (h *WalletHandler) Withdraw(c *gin.Context) {
 	var req struct {
 		UserID int     `json:"user_id"`
@@ -70,14 +92,22 @@ func (h *WalletHandler) Withdraw(c *gin.Context) {
 	var balance float64
 	err = tx.QueryRow("SELECT balance FROM users WHERE id = $1", req.UserID).Scan(&balance)
 	if err != nil || balance < req.Amount {
-		tx.Rollback()
+		if rbErr := tx.Rollback(); rbErr != nil {
+			zlog.Fatal().
+				Err(rbErr).
+				Msg("Error failed to rollback transaction")
+		}
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient balance"})
 		return
 	}
 
 	_, err = tx.Exec("UPDATE users SET balance = balance - $1 WHERE id = $2", req.Amount, req.UserID)
 	if err != nil {
-		tx.Rollback()
+		if rbErr := tx.Rollback(); rbErr != nil {
+			zlog.Fatal().
+				Err(rbErr).
+				Msg("Error failed to rollback transaction")
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update balance"})
 		return
 	}
@@ -85,15 +115,26 @@ func (h *WalletHandler) Withdraw(c *gin.Context) {
 	_, err = tx.Exec("INSERT INTO transactions (user_id, type, amount, description) VALUES ($1, $2, $3, $4)",
 		req.UserID, "withdraw", req.Amount, "Withdraw from wallet")
 	if err != nil {
-		tx.Rollback()
+		if rbErr := tx.Rollback(); rbErr != nil {
+			zlog.Fatal().
+				Err(rbErr).
+				Msg("Error failed to rollback transaction")
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to record transaction"})
 		return
 	}
 
-	tx.Commit()
+	if err := tx.Commit(); err != nil {
+		zlog.Fatal().
+			Err(err).
+			Msg("Failed to commit transaction")
+		log.Printf(": %v", err)
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Withdraw successful"})
 }
 
+// Transfer transfer money from one user to another
 func (h *WalletHandler) Transfer(c *gin.Context) {
 	var req struct {
 		FromUserID int     `json:"from_user_id"`
@@ -124,21 +165,36 @@ func (h *WalletHandler) Transfer(c *gin.Context) {
 	var balance float64
 	err = tx.QueryRow("SELECT balance FROM users WHERE id = $1", req.FromUserID).Scan(&balance)
 	if err != nil || balance < req.Amount {
-		tx.Rollback()
+		if rbErr := tx.Rollback(); rbErr != nil {
+			zlog.Fatal().
+				Err(rbErr).
+				Msg("Error failed to rollback transaction")
+			return
+		}
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient balance"})
 		return
 	}
 
 	_, err = tx.Exec("UPDATE users SET balance = balance - $1 WHERE id = $2", req.Amount, req.FromUserID)
 	if err != nil {
-		tx.Rollback()
+		if rbErr := tx.Rollback(); rbErr != nil {
+			zlog.Fatal().
+				Err(rbErr).
+				Msg("Error failed to rollback transaction")
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to deduct balance"})
 		return
 	}
 
 	_, err = tx.Exec("UPDATE users SET balance = balance + $1 WHERE id = $2", req.Amount, req.ToUserID)
 	if err != nil {
-		tx.Rollback()
+		if rbErr := tx.Rollback(); rbErr != nil {
+			zlog.Fatal().
+				Err(rbErr).
+				Msg("Error failed to rollback transaction")
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to credit balance"})
 		return
 	}
@@ -146,15 +202,28 @@ func (h *WalletHandler) Transfer(c *gin.Context) {
 	_, err = tx.Exec("INSERT INTO transactions (user_id, type, amount, description) VALUES ($1, $2, $3, $4)",
 		req.FromUserID, "transfer", req.Amount, "Transfer to user "+fmt.Sprint(req.ToUserID))
 	if err != nil {
-		tx.Rollback()
+		if rbErr := tx.Rollback(); rbErr != nil {
+			zlog.Fatal().
+				Err(rbErr).
+				Msg("Failed to rollback transaction")
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to record transaction"})
 		return
 	}
 
-	tx.Commit()
+	if err := tx.Commit(); err != nil {
+		zlog.Fatal().
+			Err(err).
+			Msg("Failed to commit transaction")
+		log.Printf(": %v", err)
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Transfer successful"})
 }
 
+// GetBalance get balance by userID
 func (h *WalletHandler) GetBalance(c *gin.Context) {
 	userID := c.Param("userID")
 	var balance float64
@@ -171,6 +240,7 @@ func (h *WalletHandler) GetBalance(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"balance": balance})
 }
 
+// GetTransactions get transactions by userID
 func (h *WalletHandler) GetTransactions(c *gin.Context) {
 	userID := c.Param("userID")
 	var transactions []struct {
@@ -190,7 +260,14 @@ func (h *WalletHandler) GetTransactions(c *gin.Context) {
 		}
 		return
 	}
-	defer rows.Close()
+
+	defer func() {
+		if err := rows.Close(); err != nil {
+			zlog.Fatal().
+				Err(err).
+				Msg("Error closing database connection")
+		}
+	}()
 
 	for rows.Next() {
 		var tx struct {

@@ -11,8 +11,8 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/crypto/bcrypt"
 	"go.uber.org/goleak"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func TestMain(m *testing.M) {

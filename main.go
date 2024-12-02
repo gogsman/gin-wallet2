@@ -12,7 +12,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-var zlog zerolog.Logger
+var zlog = zerolog.New(os.Stdout).With().Timestamp().Logger()
 
 func init() {
 	if err := godotenv.Load(); err != nil {
@@ -20,13 +20,17 @@ func init() {
 	}
 
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	zlog := zerolog.New(os.Stdout).With().Timestamp().Logger()
+	zlog = zerolog.New(os.Stdout).With().Timestamp().Logger()
 	zerolog.DefaultContextLogger = &zlog
 }
 
 func main() {
 	db := InitDB()
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Printf("failed to close database: %v", err)
+		}
+	}()
 
 	r := gin.Default()
 

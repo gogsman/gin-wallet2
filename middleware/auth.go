@@ -1,3 +1,4 @@
+// Package middleware  auth middleware
 package middleware
 
 import (
@@ -13,6 +14,7 @@ import (
 
 var jwtSecret = []byte(os.Getenv("JWT_SECRET"))
 
+// AuthMiddleware auth middleware
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 从 Header 获取 Authorization 字段

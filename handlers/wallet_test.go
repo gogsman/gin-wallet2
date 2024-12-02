@@ -62,7 +62,7 @@ func TestWalletHandler_Deposit(t *testing.T) {
 				"user_id": 1,
 				"amount":  -100.0,
 			},
-			setupMock:      func(mock sqlmock.Sqlmock) {},
+			setupMock:      func(_ sqlmock.Sqlmock) {},
 			expectedStatus: http.StatusBadRequest,
 			expectedBody: map[string]interface{}{
 				"error": "Invalid input",
@@ -209,7 +209,7 @@ func TestWalletHandler_Withdraw(t *testing.T) {
 				"user_id": 1,
 				"amount":  -50.0,
 			},
-			setupMock:      func(mock sqlmock.Sqlmock) {},
+			setupMock:      func(_ sqlmock.Sqlmock) {},
 			expectedStatus: http.StatusBadRequest,
 			expectedBody: map[string]interface{}{
 				"error": "Invalid input",
@@ -353,7 +353,7 @@ func TestWalletHandler_Transfer(t *testing.T) {
 				"user_id": 1,
 				"amount":  -100.0,
 			},
-			setupMock:      func(mock sqlmock.Sqlmock) {},
+			setupMock:      func(_ sqlmock.Sqlmock) {},
 			expectedStatus: http.StatusBadRequest,
 			expectedBody: map[string]interface{}{
 				"error": "Invalid input",

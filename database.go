@@ -1,3 +1,4 @@
+// Package main database
 package main
 
 import (
@@ -15,6 +16,7 @@ var (
 	once sync.Once
 )
 
+// InitDB initializes a single database connection and returns it.
 func InitDB() *sql.DB {
 	once.Do(func() {
 

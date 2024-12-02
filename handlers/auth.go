@@ -1,3 +1,4 @@
+// Package handlers  auth handler
 package handlers
 
 import (
@@ -14,14 +15,17 @@ import (
 
 var jwtSecret = []byte(os.Getenv("JWT_SECRET"))
 
+// AuthHandler auth handler
 type AuthHandler struct {
 	DB *sql.DB
 }
 
+// NewAuthHandler new auth handler
 func NewAuthHandler(db *sql.DB) *AuthHandler {
 	return &AuthHandler{DB: db}
 }
 
+// Register register user
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req struct {
 		Name     string `json:"name" binding:"required"`
@@ -50,6 +54,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "User created successfully"})
 }
 
+// Login login user
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req struct {
 		Name     string `json:"name" binding:"required"`
@@ -71,7 +76,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.Password)); err != nil {
+	if err1 := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.Password)); err1 != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
@@ -85,6 +90,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"token": token})
 }
 
+// generateJWT generate jwt token
 func generateJWT(userID int) (string, error) {
 	claims := jwt.MapClaims{
 		"userID": userID,
